@@ -19,7 +19,24 @@ if [ ! -d node_modules ]; then
 fi
 
 echo "Starting Visual HTML PPT Editor..."
-echo "URL: http://127.0.0.1:5173"
+echo "Please wait for the server to start..."
+echo ""
+
+# Start the development server in the background
+npm run dev &
+
+# Wait for the server to start
+echo "Waiting for server to start..."
+while ! curl -s http://127.0.0.1:5173 > /dev/null 2>&1; do
+  sleep 2
+done
+
+echo "Server is ready!"
+echo "Opening browser at http://127.0.0.1:5173"
 echo "Keep this window open while using the editor."
+echo ""
+
 open "http://127.0.0.1:5173"
-npm run dev
+
+# Keep the script running
+wait

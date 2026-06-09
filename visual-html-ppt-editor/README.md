@@ -22,7 +22,7 @@
 ### Windows 双击运行
 
 1. 先安装 Node.js LTS：`https://nodejs.org/`
-2. 双击根目录的 `/Users/weiweizeng/Desktop/html2ppt/start-windows.bat`
+2. 双击根目录的 `start-windows.bat`
 3. 浏览器会自动打开 `http://127.0.0.1:5173`
 4. 使用时不要关闭弹出的黑色命令行窗口
 
@@ -31,10 +31,10 @@
 第一次先给脚本执行权限：
 
 ```bash
-chmod +x /Users/weiweizeng/Desktop/html2ppt/start-mac.command
+chmod +x start-mac.command
 ```
 
-之后双击根目录的 `/Users/weiweizeng/Desktop/html2ppt/start-mac.command` 即可。
+之后双击根目录的 `start-mac.command` 即可。
 
 ### 命令行运行
 
@@ -60,10 +60,10 @@ npm run test:e2e
 本次交付已跑通以上三组命令。浏览器冒烟截图保存在：
 
 ```text
-/Users/weiweizeng/Desktop/html2ppt/visual-html-ppt-editor/artifacts/final-smoke.png
+visual-html-ppt-editor/artifacts/final-smoke.png
 ```
 
-并额外验证了 `/Users/weiweizeng/Desktop/htmltoppt` 下 5 个真实 HTML 样本，均按 `1600x900` 正确导入。
+并额外验证了 5 个真实 HTML 样本，均按 `1600x900` 正确导入。
 
 端到端测试还覆盖了：
 

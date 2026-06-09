@@ -14,7 +14,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-if not exist node_modules (
+if not exist node_modules\.bin (
   echo Installing dependencies. This runs only the first time...
   call npm install
   if errorlevel 1 (
@@ -27,11 +27,21 @@ if not exist node_modules (
 
 echo.
 echo Starting Visual HTML PPT Editor...
-echo URL: http://127.0.0.1:5173
+echo Please wait for the server to start...
+echo.
+
+start "" cmd /c "npm run dev"
+
+:wait_loop
+timeout /t 2 /nobreak >nul
+curl.exe -s http://127.0.0.1:5173 >nul 2>nul
+if errorlevel 1 goto wait_loop
+
+echo Server is ready!
+echo Opening browser at http://127.0.0.1:5173
 echo Keep this window open while using the editor.
 echo.
 
 start "" "http://127.0.0.1:5173"
-call npm run dev
 
 pause

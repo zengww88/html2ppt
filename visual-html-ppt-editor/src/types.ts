@@ -41,6 +41,10 @@ export interface ImportedFileHandle {
   handle?: FileSystemFileHandle;
 }
 
+export interface ResourceMap {
+  [path: string]: string; // path -> content (text for CSS, data URL for images)
+}
+
 declare global {
   interface Window {
     showOpenFilePicker?: (options?: {

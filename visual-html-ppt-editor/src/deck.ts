@@ -1,4 +1,4 @@
-import type { Deck, Slide } from "./types";
+import type { Deck, ResourceMap, Slide } from "./types";
 
 export const DEFAULT_SLIDE_WIDTH = 1280;
 export const DEFAULT_SLIDE_HEIGHT = 720;
@@ -61,10 +61,55 @@ export const DEFAULT_DECK: Deck = {
   ],
 };
 
-export function parseHtmlDeck(source: string, sourceName?: string): Deck {
+function resolveExternalStyles(doc: Document, resources?: ResourceMap): void {
+  if (!resources) return;
+  const links = Array.from(doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"][href]'));
+  for (const link of links) {
+    const href = link.getAttribute("href");
+    if (!href) continue;
+    // Extract filename from path for matching
+    const filename = href.split(/[\\/]/).pop() || href;
+    const normalizedHref = href.replace(/^\.\//, "");
+    // Try multiple matching strategies
+    const cssContent = resources[normalizedHref] || resources[href] || resources[filename];
+    if (cssContent && !cssContent.startsWith("data:")) {
+      // Create a <style> element with the CSS content
+      const style = doc.createElement("style");
+      style.textContent = cssContent;
+      link.parentNode?.insertBefore(style, link);
+      link.remove();
+    }
+  }
+}
+
+function resolveImagePaths(doc: Document, resources?: ResourceMap): void {
+  if (!resources) return;
+  const images = Array.from(doc.querySelectorAll<HTMLImageElement>("img[src]"));
+  for (const img of images) {
+    const src = img.getAttribute("src");
+    if (!src) continue;
+    // Skip data URLs and absolute URLs
+    if (src.startsWith("data:") || src.startsWith("http://") || src.startsWith("https://")) continue;
+    // Extract filename from path for matching
+    const filename = src.split(/[\\/]/).pop() || src;
+    const normalizedSrc = src.replace(/^\.\//, "");
+    // Try multiple matching strategies
+    const dataUrl = resources[normalizedSrc] || resources[src] || resources[filename];
+    if (dataUrl && dataUrl.startsWith("data:")) {
+      img.setAttribute("src", dataUrl);
+    }
+  }
+}
+
+export function parseHtmlDeck(source: string, sourceName?: string, resources?: ResourceMap): Deck {
   const parser = new DOMParser();
   const doc = parser.parseFromString(source, "text/html");
   sanitizeTree(doc);
+
+  // Resolve external CSS from <link> tags
+  resolveExternalStyles(doc, resources);
+  // Resolve image paths to data URLs
+  resolveImagePaths(doc, resources);
 
   const title = doc.querySelector("title")?.textContent?.trim() || "Imported HTML Deck";
   const globalStyles = Array.from(doc.querySelectorAll("style"))

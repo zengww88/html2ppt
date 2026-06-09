@@ -36,7 +36,7 @@ import { flushSync } from "react-dom";
 import { clearStoredDeck, loadStoredDeck, storeDeck } from "./storage";
 import { cloneDeck, createExportHtml, DEFAULT_DECK, DEFAULT_SLIDE_HEIGHT, DEFAULT_SLIDE_WIDTH, normalizeDeckEditorIds, parseHtmlDeck, replaceSlideHtml } from "./deck";
 import { downloadText, safeFilename } from "./download";
-import type { Deck, ImportedFileHandle, Rect, SelectionInfo, Slide } from "./types";
+import type { Deck, ImportedFileHandle, Rect, ResourceMap, SelectionInfo, Slide } from "./types";
 
 const MIN_SIZE = 24;
 const HANDLE_SIZE = 12;
@@ -67,6 +67,7 @@ interface HtmlImportSource {
   name: string;
   text: string;
   handle?: FileSystemFileHandle;
+  resources?: ResourceMap;
 }
 
 export default function App() {
@@ -728,10 +729,29 @@ export default function App() {
   async function onFileInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     if (files.length === 0) return;
+
+    // Build resource map from all non-HTML files
+    const resources: ResourceMap = {};
+    const htmlFiles: File[] = [];
+
+    for (const file of files) {
+      const name = file.name.toLowerCase();
+      if (name.endsWith(".html") || name.endsWith(".htm")) {
+        htmlFiles.push(file);
+      } else if (name.endsWith(".css")) {
+        // Read CSS as text
+        resources[file.name] = await file.text();
+      } else if (/\.(png|jpe?g|gif|svg|webp|bmp|ico)$/i.test(name)) {
+        // Read images as data URLs
+        resources[file.name] = await readFileAsDataUrl(file);
+      }
+    }
+
     const sources = await Promise.all(
-      files.map(async (file) => ({
+      htmlFiles.map(async (file) => ({
         name: file.name,
         text: await file.text(),
+        resources,
       })),
     );
     addHtmlSources(sources);
@@ -745,25 +765,57 @@ export default function App() {
     }
     const handles = await window.showOpenFilePicker({
       multiple: true,
-      types: [{ description: "HTML", accept: { "text/html": [".html", ".htm"] } }],
+      types: [
+        {
+          description: "HTML & Resources",
+          accept: {
+            "text/html": [".html", ".htm"],
+            "text/css": [".css"],
+            "image/*": [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".bmp", ".ico"],
+          },
+        },
+        {
+          description: "All Files",
+          accept: {
+            "*/*": [".*"],
+          },
+        },
+      ],
     });
     if (handles.length === 0) return;
-    const sources = await Promise.all(
-      handles.map(async (handle) => {
-        const file = await handle.getFile();
-        return {
+
+    // Build resource map from all non-HTML files
+    const resources: ResourceMap = {};
+    const htmlSources: HtmlImportSource[] = [];
+
+    for (const handle of handles) {
+      const file = await handle.getFile();
+      const name = file.name.toLowerCase();
+      if (name.endsWith(".html") || name.endsWith(".htm")) {
+        htmlSources.push({
           name: file.name,
           text: await file.text(),
           handle,
-        };
-      }),
-    );
-    addHtmlSources(sources);
+          resources,
+        });
+      } else if (name.endsWith(".css")) {
+        resources[file.name] = await file.text();
+      } else if (/\.(png|jpe?g|gif|svg|webp|bmp|ico)$/i.test(name)) {
+        resources[file.name] = await readFileAsDataUrl(file);
+      }
+    }
+
+    // Update resources reference for all HTML sources
+    for (const source of htmlSources) {
+      source.resources = resources;
+    }
+
+    addHtmlSources(htmlSources);
   }
 
   function replaceDeckWithHtmlSources(sources: HtmlImportSource[], nextStatus?: string) {
     if (sources.length === 0) return;
-    const parsedDecks = sources.map((source) => parseHtmlDeck(source.text, source.name));
+    const parsedDecks = sources.map((source) => parseHtmlDeck(source.text, source.name, source.resources));
     const combinedDeck = normalizeDeckEditorIds(createDeckFromSources(sources, parsedDecks));
     commitDeck(combinedDeck, nextStatus ?? `Imported ${sources.length} HTML file${sources.length === 1 ? "" : "s"}`);
     setFileHandle(sources.length === 1 && sources[0].handle ? { name: sources[0].name, handle: sources[0].handle } : null);
@@ -774,7 +826,7 @@ export default function App() {
 
   function addHtmlSources(sources: HtmlImportSource[]) {
     if (sources.length === 0) return;
-    const parsedDecks = sources.map((source) => parseHtmlDeck(source.text, source.name));
+    const parsedDecks = sources.map((source) => parseHtmlDeck(source.text, source.name, source.resources));
     const importedDeck = createDeckFromSources(sources, parsedDecks);
     const liveDeck = serializeCurrentSlide();
 
@@ -1179,7 +1231,7 @@ export default function App() {
             className="sr-only"
             type="file"
             multiple
-            accept=".html,.htm,text/html"
+            accept=".html,.htm,.css,.png,.jpg,.jpeg,.gif,.svg,.webp,.bmp,.ico"
             onChange={onFileInputChange}
             data-testid="import-file-input"
           />
